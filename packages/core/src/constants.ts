@@ -1,1 +1,1 @@
-export const ATTRIB_CWF = 'cwf2';
+export const ATTRIB_CWF = 'cwf1000';
