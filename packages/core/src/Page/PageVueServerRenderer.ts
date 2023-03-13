@@ -3,23 +3,21 @@
   Note: the function `requireFromString` causes eslint to detect a false-positive
   due to the usage of `module`. Hence, the use of the above `eslint-disable`.
 */
-import Vue from 'vue';
+import { createSSRApp } from 'vue';
+import { renderToString } from '@vue/server-renderer';
 import path from 'path';
 import fs from 'fs-extra';
-import * as VueCompiler from 'vue-template-compiler';
-import { createRenderer } from 'vue-server-renderer';
 import * as logger from '../utils/logger';
-import type { PageConfig, PageAssets } from './PageConfig';
+import type { PageAssets, PageConfig } from './PageConfig';
 import type { Page } from '.';
+
 /* eslint-enable import/no-import-module-exports */
 
 let bundle = require('@markbind/core-web/dist/js/vueCommonAppFactory.min');
 
-const { renderToString } = createRenderer();
-
 interface PageEntry {
   page: Page;
-  compiledVuePage: VueCompiler.CompiledResultFunctions;
+  compiledVuePage: string;
   pageNav: string;
 }
 
@@ -38,55 +36,29 @@ const pageEntries: { [pe: string]: PageEntry } = {};
  */
 async function compileVuePageAndCreateScript(
   content: string, pageConfig: PageConfig, pageAsset: PageAssets):
-  Promise<VueCompiler.CompiledResultFunctions> {
-  // Compile Vue Page
-  const compiledVuePage = VueCompiler.compileToFunctions(content);
-
-  // Set up script content
-  const outputContent = `
-    var pageVueRenderFn = ${compiledVuePage.render};
-    var pageVueStaticRenderFns = [${compiledVuePage.staticRenderFns}];
-  `;
-
-  // Get script file name
-  const pageHtmlFileName = path.basename(pageConfig.resultPath, '.html');
-  const scriptFileName = `${pageHtmlFileName}.page-vue-render.js`;
-
-  /*
-   * Add the script file path for this page's render function to the page's assets (to populate page.njk).
-   * The script file path is the same as the page's file path.
-   */
-  pageAsset.pageVueRenderJs = scriptFileName;
-
-  // Get script's absolute file path to output script file
-  const dirName = path.dirname(pageConfig.resultPath);
-  const filePath = path.join(dirName, scriptFileName);
-
-  await fs.outputFile(filePath, outputContent);
-
-  return compiledVuePage;
+  Promise<String> {
+  return content;
 }
-
+interface CompiledVuePage {
+  render: string;
+  staticRenderFns: string[];
+}
 /**
  * Renders Vue page app into html string (Vue SSR).
  * This function will install the MarkBindVue plugin and render the built Vue page content into html string.
  */
-async function renderVuePage(compiledVuePage: VueCompiler.CompiledResultFunctions): Promise<string> {
+async function renderVuePage(code: String) {
   const { MarkBindVue, appFactory } = bundle;
 
   const { components, directives } = MarkBindVue;
-
-  const VueAppPage = new Vue({
-    render(createElement: any) {
-      return compiledVuePage.render.apply(this, createElement);
-    },
-    staticRenderFns: compiledVuePage.staticRenderFns,
+  const app = createSSRApp({
+    template: code,
     components,
     directives,
     ...appFactory(),
   });
 
-  return renderToString(VueAppPage);
+  return await renderToString(app);
 }
 
 /**

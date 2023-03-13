@@ -136,7 +136,7 @@ header[sticky] {
 }
 
 header[sticky].hide-header {
-    transform: translateY(calc(-1 * var(--sticky-header-height)));
+    transform: translateY(calc(var(--sticky-header-height) * -1));
 }
 
 span.anchor {

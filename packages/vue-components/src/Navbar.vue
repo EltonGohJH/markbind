@@ -14,7 +14,7 @@
           </ul>
         </div>
 
-        <ul v-if="slots.right" class="navbar-nav navbar-right">
+        <ul v-if="slots?.right" class="navbar-nav navbar-right">
           <slot name="right"></slot>
         </ul>
       </div>
@@ -33,6 +33,7 @@
 </template>
 
 <script>
+import { ref, computed, onBeforeMount, onBeforeUnmount } from 'vue';
 import $ from './utils/NodeList';
 import { toBoolean } from './utils/utils';
 import normalizeUrl from './utils/urls';
@@ -68,39 +69,87 @@ export default {
       isParentNavbar: true,
     };
   },
-  data() {
+  setup(props, { slots }) {
+    const _navbar = true;
+
+    onBeforeMount(() => {
+      const $dropdown = $('.dropdown>[data-bs-toggle="dropdown"]', this.$el).parent();
+      $dropdown.on('click', '.dropdown-toggle', (e) => {
+        e.preventDefault();
+        $dropdown.each((content) => {
+          if (content.contains(e.target)) content.classList.toggle('open');
+        });
+      }).on('click', '.dropdown-menu>li>a', (e) => {
+        $dropdown.each((content) => {
+          if (content.contains(e.target)) content.classList.remove('open');
+        });
+      }).onBlur((e) => {
+        $dropdown.each((content) => {
+          if (!content.contains(e.target)) content.classList.remove('open');
+        });
+      });
+
+      // highlight current nav link
+      this.highlightLink(window.location.href);
+
+      // scroll default navbar horizontally to current link if it is beyond the current scroll
+      const currentNavlink = $(this.$refs.navbarDefault).find('.current')[0];
+      if (currentNavlink && window.innerWidth < 768
+          && currentNavlink.offsetLeft + currentNavlink.offsetWidth > window.innerWidth) {
+        this.$refs.navbarDefault.scrollLeft = currentNavlink.offsetLeft + currentNavlink.offsetWidth
+            - window.innerWidth;
+      }
+
+      this.toggleLowerNavbar();
+      $(window).on('resize', this.toggleLowerNavbar);
+
+      // scroll default navbar horizontally when mousewheel is scrolled
+      $(this.$refs.navbarDefault).on('wheel', (e) => {
+        const isDropdown = (nodes) => {
+          for (let i = 0; i < nodes.length; i += 1) {
+            if (nodes[i].classList && nodes[i].classList.contains('dropdown-menu')) {
+              return true;
+            }
+          }
+          return false;
+        };
+
+        // prevent horizontal scrolling if the scroll is on dropdown menu
+        if (window.innerWidth < 768 && !isDropdown(e.path)) {
+          e.preventDefault();
+          this.$refs.navbarDefault.scrollLeft += e.deltaY;
+        }
+      });
+    });
+
+    onBeforeUnmount(() => {
+      $('.dropdown', this.$el).off('click').offBlur();
+      $(window).off('resize', this.toggleLowerNavbar);
+      $(this.$refs.navbarDefault).off('wheel');
+    });
+
     return {
-      id: 'bs-example-navbar-collapse-1',
-      styles: {},
-      isLowerNavbarShowing: false,
+      _navbar,
+      id: ref('bs-example-navbar-collapse-1'),
+      styles: ref({}),
+      isLowerNavbarShowing: ref(false),
+      fixedBool: computed(() => toBoolean(props.fixed)),
+      fixedOptions: computed(() => (props.fixedBool ? 'navbar-fixed' : '')),
+      slots: computed(() => slots),
+      themeOptions: computed(() => {
+        switch (props.type) {
+        case 'none':
+          return '';
+        case 'light':
+          return 'navbar-light bg-light';
+        case 'dark':
+          return 'navbar-dark bg-dark';
+        case 'primary':
+        default:
+          return 'navbar-dark bg-primary';
+        }
+      }),
     };
-  },
-  computed: {
-    fixedBool() {
-      return toBoolean(this.fixed);
-    },
-    fixedOptions() {
-      if (this.fixedBool) {
-        return 'navbar-fixed';
-      }
-      return '';
-    },
-    slots() {
-      return this.$scopedSlots;
-    },
-    themeOptions() {
-      switch (this.type) {
-      case 'none':
-        return '';
-      case 'light':
-        return 'navbar-light bg-light';
-      case 'dark':
-        return 'navbar-dark bg-dark';
-      case 'primary':
-      default:
-        return 'navbar-dark bg-primary';
-      }
-    },
   },
   methods: {
     // Splits a normalised URL into its parts,
@@ -222,199 +271,14 @@ export default {
       }
     },
   },
-  created() {
-    this._navbar = true;
-  },
-  mounted() {
-    const $dropdown = $('.dropdown>[data-bs-toggle="dropdown"]', this.$el).parent();
-    $dropdown.on('click', '.dropdown-toggle', (e) => {
-      e.preventDefault();
-      $dropdown.each((content) => {
-        if (content.contains(e.target)) content.classList.toggle('open');
-      });
-    }).on('click', '.dropdown-menu>li>a', (e) => {
-      $dropdown.each((content) => {
-        if (content.contains(e.target)) content.classList.remove('open');
-      });
-    }).onBlur((e) => {
-      $dropdown.each((content) => {
-        if (!content.contains(e.target)) content.classList.remove('open');
-      });
-    });
-
-    // highlight current nav link
-    this.highlightLink(window.location.href);
-
-    // scroll default navbar horizontally to current link if it is beyond the current scroll
-    const currentNavlink = $(this.$refs.navbarDefault).find('.current')[0];
-    if (currentNavlink && window.innerWidth < 768
-        && currentNavlink.offsetLeft + currentNavlink.offsetWidth > window.innerWidth) {
-      this.$refs.navbarDefault.scrollLeft = currentNavlink.offsetLeft + currentNavlink.offsetWidth
-        - window.innerWidth;
-    }
-
-    this.toggleLowerNavbar();
-    $(window).on('resize', this.toggleLowerNavbar);
-
-    // scroll default navbar horizontally when mousewheel is scrolled
-    $(this.$refs.navbarDefault).on('wheel', (e) => {
-      const isDropdown = (nodes) => {
-        for (let i = 0; i < nodes.length; i += 1) {
-          if (nodes[i].classList && nodes[i].classList.contains('dropdown-menu')) {
-            return true;
-          }
-        }
-        return false;
-      };
-
-      // prevent horizontal scrolling if the scroll is on dropdown menu
-      if (window.innerWidth < 768 && !isDropdown(e.path)) {
-        e.preventDefault();
-        this.$refs.navbarDefault.scrollLeft += e.deltaY;
-      }
-    });
-  },
-  beforeDestroy() {
-    $('.dropdown', this.$el).off('click').offBlur();
-    $(window).off('resize', this.toggleLowerNavbar);
-    $(this.$refs.navbarDefault).off('wheel');
-  },
 };
 </script>
 
 <style scoped>
-    @media (max-width: 767px) {
-        .navbar {
-            padding-left: 0;
-            padding-right: 0;
-            padding-bottom: 0;
-        }
-
-        .navbar-left {
-            max-width: 50%;
-            order: 1;
-            padding-left: 1rem;
-        }
-
-        .navbar-left * {
-            white-space: normal;
-        }
-
-        .navbar-right {
-            order: 1;
-            max-width: 50%;
-            padding: 0 16px;
-        }
-
-        .navbar-default {
-            display: block;
-            margin-top: 0.3125rem;
-            width: 100%;
-            order: 2;
-            overflow-x: scroll;
-
-            /* Hide overflow scroll bar */
-            -ms-overflow-style: none;  /* IE and Edge */
-            scrollbar-width: none;  /* Firefox */
-        }
-
-        /* Hide overflow scroll bar for Chrome and Safari */
-        .navbar-default::-webkit-scrollbar {
-            display: none;
-        }
-
-        .navbar-default ul {
-            flex-direction: row;
-            margin-top: 0 !important;
-            width: 100%;
-        }
-
-        .navbar-default > ul > * {
-            background: rgba(0, 0, 0, 0.2);
-            padding: 0.3125rem 0.625rem;
-            flex-grow: 1;
-        }
-
-        .navbar-light .navbar-default > ul > * {
-            background: rgba(0, 0, 0, 0.05);
-        }
-
-        .navbar-default > ul > .current {
-            background: transparent;
-        }
-
-        .navbar-default a,
-        >>> .dropdown-toggle {
-            margin: 0 auto;
-            width: max-content;
-        }
-
-        >>> .dropdown {
-            display: flex;
-            align-items: center;
-        }
-
-        .container-fluid {
-            padding: 0;
-        }
-    }
-
-    .navbar-brand {
-        display: inline-block;
-    }
-
-    .navbar-brand > img,
-    .navbar-brand > svg {
-        display: block;
-    }
-
-    .navbar-right {
-        padding-right: 1rem;
-    }
-
-    .navbar-left {
-        align-items: center;
-        display: flex;
-        font-size: 1.25rem;
-        line-height: inherit;
-        padding: 0.3125rem 1rem;
-        white-space: nowrap;
-    }
-
-    .navbar-fixed {
-        position: fixed;
-        width: 100%;
-        z-index: 1000;
-    }
-
-    .navbar-default {
-        display: flex;
-        flex-basis: auto;
-        flex-grow: 1;
-        align-items: center;
-    }
-
-    >>> .dropdown-current {
-        color: #fff !important;
-        background: #007bff;
-    }
-
-    .lower-navbar-container {
-        background-color: #fff;
-        border-bottom: 1px solid #c1c1c1;
-        height: 50px;
-        width: 100%;
-        position: relative;
-    }
-
-    /* Navbar link highlight for current page */
-    .navbar.navbar-dark .navbar-nav >>> .current:not(.dropdown) a,
-    .navbar.navbar-dark .navbar-nav >>> .dropdown.current > a {
-        color: #fff;
-    }
-
-    .navbar.navbar-light .navbar-nav >>> .current:not(.dropdown) a,
-    .navbar.navbar-light .navbar-nav >>> .dropdown.current > a {
-        color: #000;
-    }
+  .navbar-default {
+      display: flex !important;
+      flex-basis: auto !important;
+      flex-grow: 1 !important;
+      align-items: center !important;
+  }
 </style>

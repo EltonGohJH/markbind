@@ -535,8 +535,7 @@ export class Page {
       compiledVuePage,
       pageNav,
     };
-    // Each source path will only contain 1 copy of build/re-build page (the latest one)
-    pageVueServerRenderer.pageEntries[this.pageConfig.sourcePath] = builtPage;
+
 
     /*
      * Server-side render Vue page app into actual html.
