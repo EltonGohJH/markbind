@@ -8,14 +8,11 @@
       "headingKeywords": {}
     },
     {
-      "src": "contents/b.md",
-      "headings": {},
-      "headingKeywords": {}
-    },
-    {
       "src": "contents/topic1.md",
       "title": "Topic 1",
-      "headings": {},
+      "headings": {
+        "topic-1": "Topic 1"
+      },
       "headingKeywords": {}
     },
     {
